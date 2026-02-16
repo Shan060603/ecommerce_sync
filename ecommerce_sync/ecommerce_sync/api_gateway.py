@@ -259,8 +259,12 @@ def create_sales_order_from_market(order_data, platform):
         return None
 
     items = []
+    skipped_items = []
+    
     for item in order_data.get('item_list', []):
-        mapping = get_erpnext_item(item.get('item_sku'), platform)
+        sku = item.get('item_sku')
+        mapping = get_erpnext_item(sku, platform)
+        
         if mapping:
             items.append({
                 "item_code": mapping.erpnext_item,
@@ -269,6 +273,16 @@ def create_sales_order_from_market(order_data, platform):
                 "warehouse": "Stores - Local",
                 "delivery_date": nowdate()
             })
+        else:
+            skipped_items.append(sku)
+
+    # If any item in the order isn't mapped, we shouldn't create a partial order
+    if skipped_items:
+        frappe.log_error(
+            title="Order Sync Skipped", 
+            message=f"Order {order_id} skipped. Unmapped SKUs: {', '.join(skipped_items)}"
+        )
+        return None
 
     if items:
         try:
@@ -282,7 +296,10 @@ def create_sales_order_from_market(order_data, platform):
                 "order_type": "Sales"
             })
             so.insert(ignore_permissions=True)
-            so.submit() 
+            # so.submit() # UNCOMMENT THIS ONCE EXPERIMENT IS SUCCESSFUL
+            
+            # Commit after each successful order to ensure data persistence
+            frappe.db.commit() 
             return so.name
         except Exception:
             frappe.log_error(frappe.get_traceback(), _("Sales Order Creation Failed"))
