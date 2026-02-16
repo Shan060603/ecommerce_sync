@@ -14,6 +14,8 @@
   "section_break_3ihk",
   "expiry_time",
   "platform",
+  "warehouse",
+  "default_customer",
   "shop_id",
   "shop_name",
   "partner_id",
@@ -84,13 +86,24 @@
    "fieldname": "expiry_time",
    "fieldtype": "Int",
    "label": "Expiry Time"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "default_customer",
+   "fieldtype": "Link",
+   "label": "Default Customer",
+   "options": "Customer"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 22:52:33.558081",
+ "modified": "2026-02-16 23:29:19.263477",
  "modified_by": "Administrator",
  "module": "Ecommerce Sync",
  "name": "Marketplace Settings",
@@ -106,7 +119,6 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
-   "submit": 1,
    "write": 1
   }
  ],
