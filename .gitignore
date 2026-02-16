@@ -1,7 +1,27 @@
-.DS_Store
+# Python bytecode
 *.pyc
+*.pyo
+__pycache__/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Environment and Build
 *.egg-info
+dist/
+build/
+bin/
+node_modules/
+
+# Frappe specific
+*.log
 *.swp
 tags
-node_modules
-__pycache__
+.project
+.pydevproject
+
+# Credentials (Crucial!)
+# If you ever create local test keys or env files, ignore them
+.env
+site_config.json

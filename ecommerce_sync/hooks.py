@@ -247,3 +247,24 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+# Scheduled Tasks
+# ---------------
+
+scheduler_events = {
+    "cron": {
+        "*/15 * * * *": [
+            "ecommerce_sync.ecommerce_sync.api_gateway.sync_orders_background"
+        ]
+    }
+}
+
+# Testing
+# -------
+
+# before_tests = "ecommerce_sync.install.before_tests"
+
+# To make the "Authorize" button work on your Settings page, 
+# you'll eventually need this line under 'doctype_js':
+doctype_js = {
+    "Marketplace Settings": "public/js/marketplace_settings.js"
+}

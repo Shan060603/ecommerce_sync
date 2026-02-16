@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-16 21:53:06.361112",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_fc76",
+  "marketplace",
+  "marketplace_sku",
+  "erpnext_item",
+  "conversion_factor",
+  "integration_enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_fc76",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "marketplace",
+   "fieldtype": "Select",
+   "label": "Marketplace",
+   "options": "Shopee\nLazada"
+  },
+  {
+   "fieldname": "marketplace_sku",
+   "fieldtype": "Data",
+   "label": "Marketplace SKU"
+  },
+  {
+   "fieldname": "erpnext_item",
+   "fieldtype": "Link",
+   "label": "ERPNext Item",
+   "options": "Item"
+  },
+  {
+   "default": "1",
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "label": "Conversion Factor"
+  },
+  {
+   "default": "0",
+   "fieldname": "integration_enabled",
+   "fieldtype": "Check",
+   "label": "Integration Enabled"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-02-16 21:56:34.934690",
+ "modified_by": "Administrator",
+ "module": "Ecommerce Sync",
+ "name": "Marketplace Item Mapping",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
