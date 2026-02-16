@@ -1,10 +1,9 @@
 import frappe
-import hmac
-import hashlib
-import time
 import requests
+import time
 from frappe import _
 from frappe.utils import flt, get_url, nowdate, now_datetime
+from ecommerce_sync.ecommerce_sync.utils import generate_shopee_sign
 
 @frappe.whitelist()
 def get_erpnext_item(marketplace_sku, platform):
@@ -36,59 +35,46 @@ def create_sync_log(platform, status, count, message, raw_data=None):
         }).insert(ignore_permissions=True)
         frappe.db.commit()
     except Exception:
-        # Fallback to standard error log if the custom DocType fails
         frappe.log_error(frappe.get_traceback(), _("Sync Log Creation Failed"))
 
 # --- AUTHENTICATION & SHOP INFO ---
 
 @frappe.whitelist()
 def initiate_auth():
-    """Generates the Auth URL for the user to click in the Marketplace Settings UI."""
+    """Generates the Auth URL using centralized utils."""
     settings = frappe.get_doc("Marketplace Settings")
-    partner_id = settings.partner_id
-    api_key = settings.get_password("api_key")
-    
     path = "/api/v2/shop/auth_partner"
-    timestamp = int(time.time())
     
-    base_string = f"{partner_id}{path}{timestamp}"
-    sign = hmac.new(api_key.encode(), base_string.encode(), hashlib.sha256).hexdigest()
+    sign, timestamp = generate_shopee_sign(
+        path, settings.partner_id, settings.get_password("api_key")
+    )
     
     redirect_url = f"{get_url()}/api/method/ecommerce_sync.ecommerce_sync.api_gateway.auth_callback"
     
     auth_url = (
         f"https://partner.shopeemobile.com{path}?"
-        f"partner_id={partner_id}&timestamp={timestamp}&sign={sign}&redirect={redirect_url}"
+        f"partner_id={settings.partner_id}&timestamp={timestamp}&sign={sign}&redirect={redirect_url}"
     )
     return auth_url
 
 @frappe.whitelist(allow_guest=True)
 def auth_callback(code=None, shop_id=None, **kwargs):
-    """Receiver for the redirection from Shopee after user login."""
+    """Receiver for Shopee OAuth redirect."""
     if not code or not shop_id:
         return "Authorization failed: Missing code or shop_id."
-
     return exchange_code_for_token(code, shop_id)
 
 def exchange_code_for_token(code, shop_id):
-    """Exchanges Auth Code for tokens and fetches Shop Name."""
+    """Exchanges Auth Code for permanent tokens."""
     settings = frappe.get_doc("Marketplace Settings")
-    partner_id = int(settings.partner_id)
-    api_key = settings.get_password("api_key")
-    
     path = "/api/v2/auth/token/get"
-    timestamp = int(time.time())
     
-    base_string = f"{partner_id}{path}{timestamp}"
-    sign = hmac.new(api_key.encode(), base_string.encode(), hashlib.sha256).hexdigest()
+    sign, timestamp = generate_shopee_sign(
+        path, settings.partner_id, settings.get_password("api_key")
+    )
     
-    url = f"https://partner.shopeemobile.com{path}?partner_id={partner_id}&timestamp={timestamp}&sign={sign}"
-    
-    payload = {
-        "code": code,
-        "shop_id": int(shop_id),
-        "partner_id": partner_id
-    }
+    url = f"https://partner.shopeemobile.com{path}?partner_id={settings.partner_id}&timestamp={timestamp}&sign={sign}"
+    payload = {"code": code, "shop_id": int(shop_id), "partner_id": int(settings.partner_id)}
 
     response = requests.post(url, json=payload)
     data = response.json()
@@ -113,46 +99,45 @@ def exchange_code_for_token(code, shop_id):
         return _("Token exchange failed. Check Error Logs.")
 
 def fetch_shop_info(settings):
-    """Fetches shop profile details from Shopee."""
+    """Gets Store Name for UI display."""
     path = "/api/v2/shop/get_shop_info"
-    timestamp = int(time.time())
-    partner_id = int(settings.partner_id)
-    shop_id = int(settings.shop_id)
     access_token = settings.get_password("access_token")
-    api_key = settings.get_password("api_key")
+    
+    sign, timestamp = generate_shopee_sign(
+        path, settings.partner_id, settings.get_password("api_key"), 
+        access_token, settings.shop_id
+    )
 
-    base_string = f"{partner_id}{path}{timestamp}{access_token}{shop_id}"
-    sign = hmac.new(api_key.encode(), base_string.encode(), hashlib.sha256).hexdigest()
-
-    url = f"https://partner.shopeemobile.com{path}"
     params = {
-        "partner_id": partner_id, "timestamp": timestamp, "sign": sign,
-        "access_token": access_token, "shop_id": shop_id
+        "partner_id": settings.partner_id, "timestamp": timestamp, "sign": sign,
+        "access_token": access_token, "shop_id": settings.shop_id
     }
 
     try:
-        res = requests.get(url, params=params)
+        res = requests.get(f"https://partner.shopeemobile.com{path}", params=params)
         return res.json().get("response")
     except Exception:
         return None
 
 def refresh_market_token():
-    """Refreshes the token if it's near expiry."""
+    """Handles token refresh using logic in utils.py."""
     settings = frappe.get_doc("Marketplace Settings")
     timestamp = int(time.time())
+    saved_expiry = int(settings.expiry_time or 0)
 
-    if not settings.expiry_time or timestamp > (settings.expiry_time - 300):
-        partner_id = int(settings.partner_id)
-        api_key = settings.get_password("api_key")
-        
+    if not saved_expiry or timestamp > (saved_expiry - 300):
         path = "/api/v2/auth/access_token/get"
-        sign = hmac.new(api_key.encode(), f"{partner_id}{path}{timestamp}".encode(), hashlib.sha256).hexdigest()
         
-        url = f"https://partner.shopeemobile.com{path}?partner_id={partner_id}&timestamp={timestamp}&sign={sign}"
+        # Pass shop_id but NOT access_token to trigger refresh-specific signature logic
+        sign, timestamp = generate_shopee_sign(
+            path, settings.partner_id, settings.get_password("api_key"), 
+            shop_id=settings.shop_id
+        )
         
+        url = f"https://partner.shopeemobile.com{path}?partner_id={settings.partner_id}&timestamp={timestamp}&sign={sign}"
         payload = {
             "refresh_token": settings.get_password("refresh_token"),
-            "partner_id": partner_id,
+            "partner_id": int(settings.partner_id),
             "shop_id": int(settings.shop_id)
         }
 
@@ -172,52 +157,45 @@ def refresh_market_token():
 # --- ORDER SYNC LOGIC ---
 
 def get_order_details(order_ids):
-    """Fetches full details (items, prices) for a list of Order SNs."""
+    """Fetches full details for a batch of Order SNs."""
     settings = frappe.get_doc("Marketplace Settings")
-    partner_id = int(settings.partner_id)
-    shop_id = int(settings.shop_id)
-    api_key = settings.get_password("api_key")
+    path = "/api/v2/order/get_order_detail"
     access_token = settings.get_password("access_token")
     
-    path = "/api/v2/order/get_order_detail"
-    timestamp = int(time.time())
+    sign, timestamp = generate_shopee_sign(
+        path, settings.partner_id, settings.get_password("api_key"), 
+        access_token, settings.shop_id
+    )
     
-    base_string = f"{partner_id}{path}{timestamp}{access_token}{shop_id}"
-    sign = hmac.new(api_key.encode(), base_string.encode(), hashlib.sha256).hexdigest()
-    
-    url = f"https://partner.shopeemobile.com{path}"
     params = {
-        "partner_id": partner_id, "timestamp": timestamp, "sign": sign,
-        "access_token": access_token, "shop_id": shop_id,
+        "partner_id": settings.partner_id, "timestamp": timestamp, "sign": sign,
+        "access_token": access_token, "shop_id": settings.shop_id,
         "order_sn_list": ",".join(order_ids),
         "response_optional_fields": "item_list"
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(f"https://partner.shopeemobile.com{path}", params=params)
     return response.json().get("response", {}).get("order_list", [])
 
 @frappe.whitelist()
 def sync_orders_background():
-    """Background task to fetch and create orders with full logging."""
+    """Background task to fetch and create orders."""
     if not refresh_market_token():
-        create_sync_log("Shopee", "Failed", 0, "Token refresh failed during background sync.")
+        create_sync_log("Shopee", "Failed", 0, "Token refresh failed.")
         return
 
     settings = frappe.get_doc("Marketplace Settings")
-    partner_id = int(settings.partner_id)
-    shop_id = int(settings.shop_id)
-    api_key = settings.get_password("api_key")
+    path = "/api/v2/order/get_order_list"
     access_token = settings.get_password("access_token")
     
-    path = "/api/v2/order/get_order_list"
-    timestamp = int(time.time())
-    
-    base_string = f"{partner_id}{path}{timestamp}{access_token}{shop_id}"
-    sign = hmac.new(api_key.encode(), base_string.encode(), hashlib.sha256).hexdigest()
+    sign, timestamp = generate_shopee_sign(
+        path, settings.partner_id, settings.get_password("api_key"), 
+        access_token, settings.shop_id
+    )
     
     params = {
-        "partner_id": partner_id, "timestamp": timestamp, "sign": sign,
-        "access_token": access_token, "shop_id": shop_id,
+        "partner_id": settings.partner_id, "timestamp": timestamp, "sign": sign,
+        "access_token": access_token, "shop_id": settings.shop_id,
         "time_range_field": "create_time",
         "time_from": timestamp - 86400,
         "time_to": timestamp,
@@ -231,7 +209,7 @@ def sync_orders_background():
         order_list = res_data.get("response", {}).get("order_list", [])
         
         if not order_list:
-            create_sync_log("Shopee", "Success", 0, "No new 'READY_TO_SHIP' orders found.")
+            create_sync_log("Shopee", "Success", 0, "No new orders found.")
             return
 
         order_ids = [o['order_sn'] for o in order_list]
@@ -244,12 +222,11 @@ def sync_orders_background():
                 success_count += 1
 
         status = "Success" if success_count == len(order_ids) else "Partial"
-        msg = f"Successfully created {success_count} out of {len(order_ids)} orders."
-        create_sync_log("Shopee", status, success_count, msg, raw_data=res_data)
+        create_sync_log("Shopee", status, success_count, f"Created {success_count} / {len(order_ids)} orders.", raw_data=res_data)
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Shopee Sync Loop Failed")
-        create_sync_log("Shopee", "Failed", 0, f"Critical Error: {str(e)}")
+        create_sync_log("Shopee", "Failed", 0, f"Error: {str(e)}")
 
 @frappe.whitelist()
 def create_sales_order_from_market(order_data, platform):
@@ -276,12 +253,8 @@ def create_sales_order_from_market(order_data, platform):
         else:
             skipped_items.append(sku)
 
-    # If any item in the order isn't mapped, we shouldn't create a partial order
     if skipped_items:
-        frappe.log_error(
-            title="Order Sync Skipped", 
-            message=f"Order {order_id} skipped. Unmapped SKUs: {', '.join(skipped_items)}"
-        )
+        frappe.log_error(title="Unmapped SKU", message=f"Order {order_id} skipped: {', '.join(skipped_items)}")
         return None
 
     if items:
@@ -296,12 +269,23 @@ def create_sales_order_from_market(order_data, platform):
                 "order_type": "Sales"
             })
             so.insert(ignore_permissions=True)
-            # so.submit() # UNCOMMENT THIS ONCE EXPERIMENT IS SUCCESSFUL
-            
-            # Commit after each successful order to ensure data persistence
+            # so.submit() # Experimental: Keep as Draft
             frappe.db.commit() 
             return so.name
         except Exception:
             frappe.log_error(frappe.get_traceback(), _("Sales Order Creation Failed"))
             return None
     return None
+
+@frappe.whitelist()
+def test_shopee_connection():
+    """Rapid test to see if current tokens work."""
+    if not refresh_market_token():
+        return {"status": "error", "message": "Auth tokens are invalid and cannot be refreshed."}
+    
+    settings = frappe.get_doc("Marketplace Settings")
+    info = fetch_shop_info(settings)
+    
+    if info:
+        return {"status": "success", "message": f"Connected to {info.get('shop_name')}"}
+    return {"status": "error", "message": "Could not fetch shop info."}

@@ -12,6 +12,7 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_3ihk",
+  "expiry_time",
   "platform",
   "shop_id",
   "shop_name",
@@ -78,13 +79,18 @@
    "fieldtype": "Data",
    "label": "Shop Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "expiry_time",
+   "fieldtype": "Int",
+   "label": "Expiry Time"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 22:22:43.251679",
+ "modified": "2026-02-16 22:52:33.558081",
  "modified_by": "Administrator",
  "module": "Ecommerce Sync",
  "name": "Marketplace Settings",

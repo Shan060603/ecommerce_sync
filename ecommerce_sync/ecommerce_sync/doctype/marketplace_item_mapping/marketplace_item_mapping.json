@@ -10,7 +10,8 @@
   "marketplace_sku",
   "erpnext_item",
   "conversion_factor",
-  "integration_enabled"
+  "enabled",
+  "amended_from"
  ],
  "fields": [
   {
@@ -42,16 +43,26 @@
   },
   {
    "default": "0",
-   "fieldname": "integration_enabled",
+   "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Integration Enabled"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Marketplace Item Mapping",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 21:56:34.934690",
+ "modified": "2026-02-16 22:47:27.606735",
  "modified_by": "Administrator",
  "module": "Ecommerce Sync",
  "name": "Marketplace Item Mapping",

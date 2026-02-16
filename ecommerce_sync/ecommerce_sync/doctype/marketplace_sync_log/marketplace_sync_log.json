@@ -11,7 +11,8 @@
   "status",
   "orders_processed",
   "details",
-  "log_json"
+  "log_json",
+  "amended_from"
  ],
  "fields": [
   {
@@ -20,7 +21,7 @@
   },
   {
    "fieldname": "sync_date",
-   "fieldtype": "Date",
+   "fieldtype": "Datetime",
    "label": "Sync Date"
   },
   {
@@ -48,13 +49,23 @@
    "fieldname": "log_json",
    "fieldtype": "JSON",
    "label": "Log JSON"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Marketplace Sync Log",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 22:27:41.214318",
+ "modified": "2026-02-16 22:49:02.216806",
  "modified_by": "Administrator",
  "module": "Ecommerce Sync",
  "name": "Marketplace Sync Log",
